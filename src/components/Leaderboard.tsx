@@ -2,6 +2,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { PitchData, GroupConfig } from '@/lib/types';
+import { groupColor, fade, SUCCESS } from '@/lib/groupColors';
+
+const MEDAL = ['#ffd34e', '#cdd6e0', '#e0945a'];
 
 interface LeaderboardProps {
   allPitches: Record<string, PitchData>;
@@ -55,12 +58,12 @@ export default function Leaderboard({
 
   return (
     <div
-      className="px-4 py-2.5 shrink-0"
-      style={{ borderBottom: '1px solid #141414' }}
+      className="px-5 py-3 shrink-0"
+      style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}
     >
-      <div className="text-xs font-mono mb-2 flex items-center gap-2" style={{ color: '#444' }}>
+      <div className="font-fr-mono mb-2 flex items-center gap-2" style={{ fontSize: '12px', letterSpacing: '3px', color: 'rgba(238,242,247,0.5)' }}>
         🏆 龍虎榜
-        <span style={{ color: '#2a2a2a' }}>— {ranked.length} 組完賽</span>
+        <span style={{ color: 'rgba(238,242,247,0.3)' }}>· LEADERBOARD — {ranked.length} 組完賽</span>
       </div>
 
       <div className="flex gap-2.5 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
@@ -68,6 +71,8 @@ export default function Leaderboard({
           {ranked.map((entry, index) => {
             const isChamp = index === 0;
             const isFlashing = isChamp && flashChamp;
+            const color = groupColor(entry.id);
+            const rankColor = index < 3 ? MEDAL[index] : 'rgba(238,242,247,0.45)';
 
             return (
               <motion.div
@@ -80,7 +85,9 @@ export default function Leaderboard({
                   x: 0,
                   scale: 1,
                   boxShadow: isFlashing
-                    ? ['0 0 0px transparent', '0 0 16px rgba(196,36,48,0.5)', '0 0 0px transparent']
+                    ? ['0 0 0px transparent', `0 0 22px ${fade(color, 55)}`, '0 0 0px transparent']
+                    : isChamp
+                    ? `0 0 24px ${fade(color, 28)}`
                     : 'none',
                 }}
                 exit={{ opacity: 0, scale: 0.78, x: -20 }}
@@ -89,13 +96,16 @@ export default function Leaderboard({
                   default:   { type: 'spring', stiffness: 280, damping: 24 },
                   boxShadow: { duration: 1.2 },
                 }}
-                className="relative flex-shrink-0 rounded-xl p-3"
+                className="relative flex-shrink-0 rounded-xl p-3 overflow-hidden"
                 style={{
-                  minWidth: '116px',
-                  background: isChamp ? '#170906' : entry.success ? '#0f0808' : '#0c0c08',
-                  border: `1px solid ${isChamp ? '#4a1410' : entry.success ? '#2a1010' : '#221e10'}`,
+                  minWidth: '120px',
+                  background: `linear-gradient(180deg, ${fade(color, isChamp ? 16 : 10)}, rgba(255,255,255,0.02))`,
+                  border: `1px solid ${fade(color, isChamp ? 70 : 38)}`,
                 }}
               >
+                {/* color top edge */}
+                <div className="absolute top-0 left-0 right-0" style={{ height: '3px', background: color }} />
+
                 {/* Crown for champion */}
                 {isChamp && (
                   <motion.div
@@ -108,33 +118,28 @@ export default function Leaderboard({
                 )}
 
                 {/* Rank + success */}
-                <div className="flex items-center gap-1 mb-1">
-                  <span
-                    className="text-xs font-mono font-bold"
-                    style={{ color: isChamp ? '#C42430' : '#444' }}
-                  >
+                <div className="flex items-center gap-1.5 mb-1">
+                  <span className="font-fr" style={{ fontSize: '15px', fontWeight: 900, color: rankColor }}>
                     #{index + 1}
                   </span>
+                  <span className="w-2 h-2 rounded-full" style={{ background: color, boxShadow: `0 0 10px ${fade(color, 60)}` }} />
                   {entry.success && (
-                    <span className="text-xs font-mono" style={{ color: '#C42430' }}>✓</span>
+                    <span className="font-fr-mono ml-auto" style={{ fontSize: '10px', color: SUCCESS }}>✓</span>
                   )}
                 </div>
 
                 {/* Group info */}
-                <div className="text-xs font-mono truncate" style={{ color: '#555' }}>
+                <div className="font-fr-mono truncate" style={{ fontSize: '11px', color: 'rgba(238,242,247,0.55)' }}>
                   第{entry.id}組{entry.name ? ` · ${entry.name}` : ''}
                 </div>
 
                 {/* Amount */}
-                <div
-                  className="text-xl font-display font-black mt-1.5"
-                  style={{ color: isChamp ? '#C42430' : entry.success ? '#C42430' : '#C09818' }}
-                >
+                <div className="font-fr mt-1.5" style={{ fontSize: '22px', fontWeight: 900, color: '#fff', fontVariantNumeric: 'tabular-nums' }}>
                   ${(entry.raised / 10_000).toFixed(0)}萬
                 </div>
 
                 {entry.target > 0 && (
-                  <div className="text-xs font-mono mt-0.5" style={{ color: '#2a2a2a' }}>
+                  <div className="font-fr-mono mt-0.5" style={{ fontSize: '10px', color: 'rgba(238,242,247,0.35)' }}>
                     /{(entry.target / 10_000).toFixed(0)}萬
                   </div>
                 )}

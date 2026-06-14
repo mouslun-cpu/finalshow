@@ -56,3 +56,9 @@ export interface Presence {
   lastSeen: number;
   groupId: string;
 }
+
+export interface SessionMeta {
+  name: string;
+  createdAt: number;
+  status: 'active' | 'ended';
+}

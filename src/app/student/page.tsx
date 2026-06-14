@@ -11,7 +11,6 @@ import {
 } from '@/hooks/useGameState';
 import type { RiceScore } from '@/lib/types';
 
-// Muted tech colors
 const C = {
   amber:  '#D4850C',
   gold:   '#C09818',
@@ -60,9 +59,36 @@ const CHIPS = [
   { label: '+100萬', amount: 1_000_000 },
 ];
 
+// ── No Session Screen ─────────────────────────────────────────────────────
+function NoSessionScreen() {
+  return (
+    <main
+      className="min-h-screen flex flex-col items-center justify-center gap-6 px-6"
+      style={{ background: '#080808' }}
+    >
+      <motion.div
+        initial={{ opacity: 0, y: -12 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="text-center"
+      >
+        <div className="text-4xl mb-4">🦈</div>
+        <div className="text-xl font-display font-black" style={{ color: C.amber }}>
+          SHARK TANK ARENA
+        </div>
+        <div className="text-sm font-mono mt-3" style={{ color: '#555' }}>
+          請掃描老師的 QR 碼加入場次
+        </div>
+        <div className="text-xs font-mono mt-2" style={{ color: '#333' }}>
+          Scan the QR code to join a session
+        </div>
+      </motion.div>
+    </main>
+  );
+}
+
 // ── Group Picker ─────────────────────────────────────────────────────────
-function GroupPicker({ onSelect }: { onSelect: (id: string) => void }) {
-  const activeGroupIds = useActiveGroupIds();
+function GroupPicker({ sessionId, onSelect }: { sessionId: string; onSelect: (id: string) => void }) {
+  const activeGroupIds = useActiveGroupIds(sessionId);
   return (
     <main
       className="min-h-screen flex flex-col items-center justify-center gap-8 px-6"
@@ -114,21 +140,28 @@ function GroupPicker({ onSelect }: { onSelect: (id: string) => void }) {
 
 // ── Main student page ────────────────────────────────────────────────────
 export default function StudentPage() {
-  const [groupId, setGroupId] = useState<string>('');
-  const [hydrated, setHydrated] = useState(false);
+  const [sessionId, setSessionId] = useState('');
+  const [groupId, setGroupId]     = useState<string>('');
+  const [hydrated, setHydrated]   = useState(false);
 
-  // Hydrate from URL param or localStorage
+  // Hydrate session + group from URL params / localStorage
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
+    const sid = params.get('session') ?? localStorage.getItem('shark_session') ?? '';
     const fromUrl = params.get('group');
-    const fromStorage = localStorage.getItem('shark_group');
-    const resolved = fromUrl || fromStorage || '';
-    setGroupId(resolved);
+    const fromStorage = sid ? localStorage.getItem(`shark_group_${sid}`) : null;
+    const gid = fromUrl || fromStorage || '';
+
+    // Persist session to localStorage
+    if (sid) localStorage.setItem('shark_session', sid);
+
+    setSessionId(sid);
+    setGroupId(gid);
     setHydrated(true);
   }, []);
 
   const handleGroupSelect = (id: string) => {
-    localStorage.setItem('shark_group', id);
+    if (sessionId) localStorage.setItem(`shark_group_${sessionId}`, id);
     const url = new URL(window.location.href);
     url.searchParams.set('group', id);
     window.history.replaceState(null, '', url.toString());
@@ -137,15 +170,15 @@ export default function StudentPage() {
 
   // Presence ping
   useEffect(() => {
-    if (!groupId) return;
-    pingPresence(groupId).catch(() => {});
-    const id = setInterval(() => pingPresence(groupId).catch(() => {}), 30_000);
+    if (!sessionId || !groupId) return;
+    pingPresence(sessionId, groupId).catch(() => {});
+    const id = setInterval(() => pingPresence(sessionId, groupId).catch(() => {}), 30_000);
     return () => clearInterval(id);
-  }, [groupId]);
+  }, [sessionId, groupId]);
 
-  const gameState = useGameState();
-  const investor  = useInvestor(groupId);
-  const groups    = useGroups();
+  const gameState = useGameState(sessionId);
+  const investor  = useInvestor(sessionId, groupId);
+  const groups    = useGroups(sessionId);
 
   const riceEnabled = gameState?.riceEnabled ?? true;
 
@@ -176,29 +209,30 @@ export default function StudentPage() {
   );
 
   const handleSubmit = useCallback(async () => {
-    if (!gameState?.currentPitchGroupId || !groupId) return;
+    if (!gameState?.currentPitchGroupId || !groupId || !sessionId) return;
     if (investAmount <= 0) { setError('請設定投資金額'); return; }
     if (investAmount > remaining) { setError('餘額不足！'); return; }
     setSubmitting(true);
     try {
       const effectiveRice = riceEnabled ? rice : { R: 0, I: 0, C: 0, E: 0 };
-      await submitInvestment(groupId, gameState.currentPitchGroupId, investAmount, effectiveRice);
+      await submitInvestment(sessionId, groupId, gameState.currentPitchGroupId, investAmount, effectiveRice);
       setStep('done');
     } catch (_) {
       setError('送出失敗，請重試');
     } finally {
       setSubmitting(false);
     }
-  }, [gameState, groupId, investAmount, remaining, rice, riceEnabled]);
+  }, [sessionId, gameState, groupId, investAmount, remaining, rice, riceEnabled]);
 
   if (!hydrated) return null;
-  if (!groupId) return <GroupPicker onSelect={handleGroupSelect} />;
+  if (!sessionId) return <NoSessionScreen />;
+  if (!groupId) return <GroupPicker sessionId={sessionId} onSelect={handleGroupSelect} />;
 
   const isWaiting   = !gameState || gameState.phase === 'waiting';
   const isSelfPitch = !isWaiting && gameState?.currentPitchGroupId === groupId;
 
   if (isWaiting) return <WaitingScreen groupId={groupId} groups={groups} remaining={remaining} onChangeGroup={() => {
-    localStorage.removeItem('shark_group');
+    if (sessionId) localStorage.removeItem(`shark_group_${sessionId}`);
     setGroupId('');
   }} />;
 
@@ -231,7 +265,7 @@ export default function StudentPage() {
     </main>
   );
 
-  const currentName = groups[groupId]?.name || `第${groupId}組`;  // footer display only
+  const currentName = groups[groupId]?.name || `第${groupId}組`;
 
   return (
     <main
@@ -448,7 +482,7 @@ export default function StudentPage() {
         <span>{currentName}</span>
         <button
           onClick={() => {
-            localStorage.removeItem('shark_group');
+            if (sessionId) localStorage.removeItem(`shark_group_${sessionId}`);
             setGroupId('');
           }}
           className="underline"

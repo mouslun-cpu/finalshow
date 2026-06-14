@@ -5,6 +5,7 @@ import { GROUP_IDS, saveAllGroupConfigs, saveActiveGroupIds, syncInvestorsToActi
 import type { GroupConfig } from '@/lib/types';
 
 interface GroupEditorProps {
+  sessionId: string;
   open: boolean;
   onClose: () => void;
   initialGroups: Record<string, GroupConfig>;
@@ -12,6 +13,7 @@ interface GroupEditorProps {
 }
 
 export default function GroupEditor({
+  sessionId,
   open,
   onClose,
   initialGroups,
@@ -54,11 +56,11 @@ export default function GroupEditor({
   const handleSave = async () => {
     setSaving(true);
     try {
-      await saveActiveGroupIds(activeIds);
+      await saveActiveGroupIds(sessionId, activeIds);
       const filtered: Record<string, GroupConfig> = {};
       GROUP_IDS.forEach((id) => { filtered[id] = configs[id] ?? { name: '', topic: '' }; });
-      await saveAllGroupConfigs(filtered);
-      await syncInvestorsToActiveGroups(activeIds);
+      await saveAllGroupConfigs(sessionId, filtered);
+      await syncInvestorsToActiveGroups(sessionId, activeIds);
       setSaved(true);
       setTimeout(onClose, 700);
     } catch (_) {

@@ -1,22 +1,9 @@
 'use client';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useMemo } from 'react';
+import { fade, SUCCESS } from '@/lib/groupColors';
 
 const TOTAL_SEGMENTS = 20;
-
-// Muted color palette — visible but not burning-bright
-const COLORS = {
-  low:    { fill: '#C08010', glow: 'rgba(192,128,16,0.55)' },
-  mid:    { fill: '#C05820', glow: 'rgba(192,88,32,0.55)'  },
-  high:   { fill: '#B82830', glow: 'rgba(184,40,48,0.55)'  },
-};
-
-function getColors(index: number) {
-  const progress = index / (TOTAL_SEGMENTS - 1);
-  if (progress < 0.5) return COLORS.low;
-  if (progress < 0.75) return COLORS.mid;
-  return COLORS.high;
-}
 
 interface LedBarProps {
   litSegments: number;
@@ -24,112 +11,258 @@ interface LedBarProps {
   totalRaised: number;
   targetAmount: number;
   isSuccess?: boolean;
+  /** Signature neon color of the group currently raising. */
+  color?: string;
 }
 
+/**
+ * Fund Rush「注金金錢柱」— a tall, heavy neon money column that fills like a
+ * tank as funding pours in. Replaces the old flat LED strip with a glowing
+ * liquid tube: rising bubbles, a shimmering meniscus, a glowing goal line,
+ * a warning flash as it nears the target, and a「募資成功」stamp on success.
+ */
 export default function LedBar({
   litSegments,
   targetSegment = 15,
   totalRaised,
   targetAmount,
   isSuccess = false,
+  color = 'oklch(0.83 0.16 82)',
 }: LedBarProps) {
-  const segments = useMemo(
+  const fillPct = Math.min(100, (litSegments / TOTAL_SEGMENTS) * 100);
+  const goalPct = (targetSegment / TOTAL_SEGMENTS) * 100; // goal line height (75%)
+  const progress = Math.round((totalRaised / targetAmount) * 100); // 達標進度
+  const near = progress >= 82 && !isSuccess;
+
+  const maxWan = Math.round((targetAmount / targetSegment) * TOTAL_SEGMENTS / 10_000);
+  const targetWan = Math.round(targetAmount / 10_000);
+
+  const bubbles = useMemo(
     () =>
-      Array.from({ length: TOTAL_SEGMENTS }, (_, i) => {
-        const displayIndex = TOTAL_SEGMENTS - 1 - i; // top-first
-        return {
-          displayIndex,
-          isLit: displayIndex < litSegments,
-          isTarget: displayIndex === targetSegment - 1,
-          ...getColors(displayIndex),
-        };
-      }),
-    [litSegments, targetSegment]
+      Array.from({ length: 9 }).map((_, i) => (
+        <span
+          key={i}
+          style={{
+            position: 'absolute',
+            bottom: '4px',
+            left: `${8 + i * 11}%`,
+            width: `${4 + (i % 3) * 3}px`,
+            height: `${4 + (i % 3) * 3}px`,
+            borderRadius: '50%',
+            background: 'rgba(255,255,255,0.7)',
+            animation: `fr-bubble ${3 + (i % 4) * 0.7}s ease-in ${i * 0.45}s infinite`,
+          }}
+        />
+      )),
+    []
   );
 
-  const pct = Math.min(100, Math.round((totalRaised / targetAmount) * 100));
+  const ticks = useMemo(() => {
+    const vals = [0, 25, 50, 75, 100];
+    return vals.map((v) => (
+      <div
+        key={v}
+        style={{
+          position: 'absolute',
+          left: 0,
+          right: 0,
+          bottom: `${v}%`,
+          height: '1px',
+          background: 'rgba(255,255,255,0.10)',
+        }}
+      >
+        <span
+          className="font-fr-mono"
+          style={{
+            position: 'absolute',
+            left: '6px',
+            bottom: '2px',
+            fontSize: '9px',
+            color: 'rgba(238,242,247,0.35)',
+          }}
+        >
+          {Math.round((maxWan * v) / 100)}
+        </span>
+      </div>
+    ));
+  }, [maxWan]);
 
   return (
-    <div className="flex flex-col items-center gap-1 h-full justify-center select-none">
-      <div className="text-xs font-mono mb-1 tracking-widest" style={{ color: '#444' }}>▲ MAX</div>
-
-      <div className="flex flex-col gap-[3px] w-20">
-        {segments.map(({ displayIndex, isLit, isTarget, fill, glow }) => (
-          <div key={displayIndex} className="relative">
-            {/* Target line */}
-            {isTarget && (
-              <>
-                <div
-                  className="absolute -left-6 -right-6 top-1/2 -translate-y-1/2 h-px z-10"
-                  style={{ background: 'rgba(180,30,40,0.7)' }}
-                />
-                <div
-                  className="absolute -right-12 top-1/2 -translate-y-1/2 text-xs font-mono whitespace-nowrap z-10"
-                  style={{ color: '#A82030', fontSize: '10px' }}
-                >
-                  目標線
-                </div>
-              </>
-            )}
-
-            <motion.div
-              className="w-full rounded-sm relative overflow-hidden"
-              style={{ height: '22px', border: '1px solid' }}
-              animate={{
-                backgroundColor: isLit ? fill : '#181818',
-                boxShadow: isLit
-                  ? `0 0 5px ${fill}, 0 0 10px ${glow}`
-                  : 'inset 0 0 3px rgba(0,0,0,0.6)',
-                borderColor: isLit ? fill : '#242424',
-              }}
-              transition={{ duration: 0.07, ease: 'easeOut' }}
-            >
-              {isLit && (
-                <div
-                  className="absolute inset-0 opacity-20"
-                  style={{
-                    background: 'linear-gradient(180deg, rgba(255,255,255,0.35) 0%, transparent 55%)',
-                  }}
-                />
-              )}
-              {!isLit && (
-                <div
-                  className="absolute inset-0"
-                  style={{
-                    background:
-                      'repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(255,255,255,0.03) 3px, rgba(255,255,255,0.03) 4px)',
-                  }}
-                />
-              )}
-            </motion.div>
-          </div>
-        ))}
+    <div className="flex flex-col items-center gap-3 h-full justify-center select-none">
+      {/* header: 注金量能 + 達標進度 */}
+      <div className="flex flex-col items-center leading-none gap-1">
+        <span
+          className="font-fr-mono"
+          style={{ fontSize: '11px', letterSpacing: '4px', color: 'rgba(238,242,247,0.4)' }}
+        >
+          注金量能
+        </span>
+        <motion.span
+          className="font-fr"
+          style={{ fontWeight: 900, fontSize: '34px', fontVariantNumeric: 'tabular-nums' }}
+          animate={{ color: isSuccess ? SUCCESS : '#fff' }}
+        >
+          {Math.min(progress, 999)}%
+        </motion.span>
       </div>
 
-      <div className="text-xs font-mono mt-1 tracking-widest" style={{ color: '#444' }}>▼ 000</div>
-
-      <motion.div
-        className="mt-3 font-mono text-sm font-bold"
-        animate={{
-          color: isSuccess ? '#1A9952' : litSegments >= targetSegment ? '#B82830' : '#C08010',
+      {/* the tube */}
+      <div
+        className="relative flex-1"
+        style={{
+          width: '176px',
+          borderRadius: '26px',
+          overflow: 'hidden',
+          background: 'linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.015))',
+          border: '1px solid rgba(255,255,255,0.12)',
+          boxShadow: 'inset 0 0 40px rgba(0,0,0,0.6)',
         }}
-        style={{ textShadow: 'none' }}
       >
-        {pct}%
-      </motion.div>
+        {/* warn glow near goal */}
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            zIndex: 5,
+            opacity: near ? 1 : 0,
+            transition: 'opacity 0.3s',
+            background: 'linear-gradient(180deg, rgba(255,76,76,0.35), transparent 50%)',
+            boxShadow: 'inset 0 0 50px rgba(255,76,76,0.5)',
+            animation: near ? 'fr-warn 1s ease-in-out infinite' : 'none',
+          }}
+        />
 
-      <AnimatePresence>
-        {isSuccess && (
-          <motion.div
-            className="absolute inset-0 pointer-events-none rounded-xl"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: [0, 0.15, 0] }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.6, repeat: 3 }}
-            style={{ background: 'radial-gradient(circle, rgba(26,153,82,0.3), transparent 70%)' }}
+        {/* colored edge */}
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            borderRadius: '26px',
+            pointerEvents: 'none',
+            zIndex: 6,
+            border: `1.5px solid ${fade(color, 55)}`,
+            boxShadow: `inset 0 0 36px ${fade(color, 22)}`,
+          }}
+        />
+
+        {/* liquid fill */}
+        <motion.div
+          style={{
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            background: `repeating-linear-gradient(0deg, rgba(0,0,0,0.16) 0 2px, transparent 2px 28px), linear-gradient(180deg, ${fade(
+              color,
+              92
+            )} 0%, ${color} 24%, ${fade(color, 72)} 100%)`,
+            boxShadow: `0 -8px 34px ${fade(color, 65)}`,
+          }}
+          animate={{ height: `${fillPct}%` }}
+          transition={{ type: 'spring', stiffness: 90, damping: 20 }}
+        >
+          {/* meniscus shimmer */}
+          <div
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              height: '14px',
+              background: 'rgba(255,255,255,0.85)',
+              filter: 'blur(1px)',
+              transformOrigin: 'center',
+              animation: 'fr-menis 2.4s ease-in-out infinite',
+            }}
           />
-        )}
-      </AnimatePresence>
+          {/* bubbles */}
+          <div style={{ position: 'absolute', inset: 0, overflow: 'hidden' }}>{bubbles}</div>
+        </motion.div>
+
+        {/* goal line */}
+        <div
+          style={{
+            position: 'absolute',
+            left: 0,
+            right: 0,
+            bottom: `${goalPct}%`,
+            height: 0,
+            borderTop: '2px dashed rgba(255,255,255,0.85)',
+            zIndex: 4,
+          }}
+        >
+          <div
+            className="font-fr-mono"
+            style={{
+              position: 'absolute',
+              right: '8px',
+              top: '-24px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '3px 10px',
+              borderRadius: '6px',
+              background: 'rgba(8,10,18,0.9)',
+              border: '1px solid rgba(255,255,255,0.25)',
+              fontSize: '10px',
+              letterSpacing: '2px',
+              color: '#fff',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            目標 {targetWan}萬
+          </div>
+        </div>
+
+        {/* scale ticks */}
+        <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 3 }}>{ticks}</div>
+
+        {/* success stamp */}
+        <AnimatePresence>
+          {isSuccess && (
+            <motion.div
+              initial={{ opacity: 0, scale: 1.4 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0 }}
+              style={{
+                position: 'absolute',
+                inset: 0,
+                zIndex: 7,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <div
+                className="font-fr"
+                style={{
+                  transform: 'rotate(-9deg)',
+                  padding: '10px 16px',
+                  border: `3px solid ${SUCCESS}`,
+                  borderRadius: '12px',
+                  background: 'rgba(8,18,14,0.6)',
+                  color: SUCCESS,
+                  fontWeight: 900,
+                  fontSize: '24px',
+                  letterSpacing: '2px',
+                  boxShadow: `0 0 30px ${fade(SUCCESS, 50)}`,
+                }}
+              >
+                募資成功
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
+      {/* footer scale */}
+      <div
+        className="flex justify-between font-fr-mono"
+        style={{ width: '176px', fontSize: '10px', letterSpacing: '2px', color: 'rgba(238,242,247,0.4)' }}
+      >
+        <span>0</span>
+        <span>MAX {maxWan}萬</span>
+      </div>
     </div>
   );
 }

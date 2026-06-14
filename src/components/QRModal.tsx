@@ -4,18 +4,19 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { QRCodeSVG } from 'qrcode.react';
 
 interface QRModalProps {
+  sessionId: string;
   open: boolean;
   onClose: () => void;
 }
 
-export default function QRModal({ open, onClose }: QRModalProps) {
+export default function QRModal({ sessionId, open, onClose }: QRModalProps) {
   const [origin, setOrigin] = useState('');
 
   useEffect(() => {
     setOrigin(typeof window !== 'undefined' ? window.location.origin : '');
   }, []);
 
-  const studentUrl = `${origin}/student`;
+  const studentUrl = `${origin}/student?session=${sessionId}`;
 
   return (
     <AnimatePresence>

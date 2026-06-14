@@ -2,18 +2,20 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { ref, onValue, update } from 'firebase/database';
 import { db } from '@/lib/firebase';
+import { sp } from '@/hooks/useGameState';
 import type { Transaction } from '@/lib/types';
 
-const SEGMENT_ANIM_MS = 120; // ms per LED segment lighting up
-const TX_GAP_MS = 400;       // gap between transactions
+const SEGMENT_ANIM_MS = 120;
+const TX_GAP_MS = 400;
 
 interface AnimState {
-  displayedRaised: number;  // what the bar currently shows
-  litSegments: number;      // 0–20
+  displayedRaised: number;
+  litSegments: number;
   processingTx: Transaction | null;
 }
 
 export function useAnimQueue(
+  sessionId: string,
   pitchGroupId: string | null,
   targetAmount: number,
   totalSegments = 20
@@ -24,12 +26,10 @@ export function useAnimQueue(
     processingTx: null,
   });
 
-  // Internal queue stored in a ref (mutable, no re-render on push)
   const queueRef = useRef<Transaction[]>([]);
   const processingRef = useRef(false);
-  const displayedRef = useRef(0); // tracks current displayed amount between renders
+  const displayedRef = useRef(0);
 
-  // Process a single transaction: animate segments one by one
   const processTx = useCallback(
     async (tx: Transaction) => {
       const prevRaised = displayedRef.current;
@@ -46,7 +46,6 @@ export function useAnimQueue(
 
       setAnimState((s) => ({ ...s, processingTx: tx }));
 
-      // Animate segments one at a time
       for (let seg = prevSegments + 1; seg <= nextSegments; seg++) {
         await new Promise<void>((r) => setTimeout(r, SEGMENT_ANIM_MS));
         const partialRaised =
@@ -58,7 +57,6 @@ export function useAnimQueue(
         });
       }
 
-      // Finalize
       displayedRef.current = nextRaised;
       setAnimState({
         displayedRaised: nextRaised,
@@ -66,15 +64,13 @@ export function useAnimQueue(
         processingTx: null,
       });
 
-      // Mark animated in Firebase
       try {
-        await update(ref(db, `/transactions/${tx.id}`), { animated: true });
+        await update(ref(db, sp(sessionId, `transactions/${tx.id}`)), { animated: true });
       } catch (_) {}
     },
-    [targetAmount, totalSegments]
+    [sessionId, targetAmount, totalSegments]
   );
 
-  // Queue runner
   const runQueue = useCallback(async () => {
     if (processingRef.current) return;
     processingRef.current = true;
@@ -88,11 +84,10 @@ export function useAnimQueue(
     processingRef.current = false;
   }, [processTx]);
 
-  // Listen to Firebase for new un-animated transactions
   useEffect(() => {
-    if (!pitchGroupId) return;
+    if (!sessionId || !pitchGroupId) return;
 
-    const r = ref(db, '/transactions');
+    const r = ref(db, sp(sessionId, 'transactions'));
     const unsub = onValue(r, (snap) => {
       if (!snap.exists()) return;
       const all = snap.val() as Record<string, Transaction>;
@@ -101,7 +96,6 @@ export function useAnimQueue(
         .map(([id, tx]) => ({ ...tx, id }))
         .sort((a, b) => a.timestamp - b.timestamp);
 
-      // Only enqueue truly new ones (not already in queue)
       const existingIds = new Set(queueRef.current.map((t) => t.id));
       const newOnes = pending.filter((tx) => !existingIds.has(tx.id));
       if (newOnes.length > 0) {
@@ -111,9 +105,8 @@ export function useAnimQueue(
     });
 
     return unsub;
-  }, [pitchGroupId, runQueue]);
+  }, [sessionId, pitchGroupId, runQueue]);
 
-  // Reset when pitch changes
   const reset = useCallback((initialRaised = 0) => {
     queueRef.current = [];
     processingRef.current = false;
