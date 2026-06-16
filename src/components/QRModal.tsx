@@ -7,16 +7,33 @@ interface QRModalProps {
   sessionId: string;
   open: boolean;
   onClose: () => void;
+  /** When set, the QR joins directly as this investor (e.g. teacher 'T'). */
+  groupId?: string;
+  /** Heading shown above the QR. */
+  title?: string;
+  /** Hint shown below the URL. */
+  hint?: string;
+  /** Label for the URL block. */
+  urlLabel?: string;
 }
 
-export default function QRModal({ sessionId, open, onClose }: QRModalProps) {
+export default function QRModal({
+  sessionId,
+  open,
+  onClose,
+  groupId,
+  title = '掃描 QR Code 加入課堂',
+  hint = '進入後選擇自己的組別',
+  urlLabel = '學生端網址',
+}: QRModalProps) {
   const [origin, setOrigin] = useState('');
 
   useEffect(() => {
     setOrigin(typeof window !== 'undefined' ? window.location.origin : '');
   }, []);
 
-  const studentUrl = `${origin}/student?session=${sessionId}`;
+  const studentUrl =
+    `${origin}/student?session=${sessionId}` + (groupId ? `&group=${groupId}` : '');
 
   return (
     <AnimatePresence>
@@ -46,7 +63,7 @@ export default function QRModal({ sessionId, open, onClose }: QRModalProps) {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="text-sm font-mono" style={{ color: '#888' }}>
-              掃描 QR Code 加入課堂
+              {title}
             </div>
 
             {/* QR Code */}
@@ -67,7 +84,7 @@ export default function QRModal({ sessionId, open, onClose }: QRModalProps) {
 
             {/* URL display */}
             <div className="text-center space-y-1">
-              <div className="text-xs font-mono" style={{ color: '#555' }}>學生端網址</div>
+              <div className="text-xs font-mono" style={{ color: '#555' }}>{urlLabel}</div>
               <div
                 className="text-sm font-mono px-4 py-2 rounded-lg select-all"
                 style={{ background: '#0e0e0e', color: '#aaa', border: '1px solid #222' }}
@@ -75,7 +92,7 @@ export default function QRModal({ sessionId, open, onClose }: QRModalProps) {
                 {studentUrl}
               </div>
               <div className="text-xs font-mono" style={{ color: '#444' }}>
-                進入後選擇自己的組別
+                {hint}
               </div>
             </div>
 

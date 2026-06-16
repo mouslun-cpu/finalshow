@@ -8,6 +8,8 @@ import {
   useActiveGroupIds,
   submitInvestment,
   pingPresence,
+  setInvestorBudget,
+  TEACHER_INVESTOR_ID,
 } from '@/hooks/useGameState';
 import type { RiceScore } from '@/lib/types';
 
@@ -59,26 +61,64 @@ const CHIPS = [
   { label: '+100萬', amount: 1_000_000 },
 ];
 
+// ── FUND RUSH brand mark (shared across start screens) ─────────────────────
+function BrandMark({ size = 'md' }: { size?: 'md' | 'lg' }) {
+  const big = size === 'lg';
+  return (
+    <div className="flex flex-col items-center">
+      <div
+        className="rounded-2xl flex items-center justify-center"
+        style={{
+          width: big ? '64px' : '52px',
+          height: big ? '64px' : '52px',
+          marginBottom: big ? '18px' : '14px',
+          background: 'linear-gradient(135deg, #ffd34e, #ff6a3d)',
+          boxShadow: '0 0 32px rgba(255,150,60,0.5)',
+        }}
+      >
+        <span style={{ color: '#1a1206', fontSize: big ? '30px' : '24px' }}>▲</span>
+      </div>
+      <div
+        className="font-fr font-black"
+        style={{
+          fontSize: big ? '40px' : '32px',
+          letterSpacing: big ? '6px' : '5px',
+          lineHeight: 1,
+          background: 'linear-gradient(90deg,#ffe07a,#ff7a45)',
+          WebkitBackgroundClip: 'text',
+          backgroundClip: 'text',
+          color: 'transparent',
+        }}
+      >
+        FUND RUSH
+      </div>
+      <div
+        className="font-fr-mono mt-2"
+        style={{ fontSize: big ? '12px' : '11px', letterSpacing: '6px', color: 'rgba(238,242,247,0.45)' }}
+      >
+        資本擂台 ARENA
+      </div>
+    </div>
+  );
+}
+
 // ── No Session Screen ─────────────────────────────────────────────────────
 function NoSessionScreen() {
   return (
     <main
       className="min-h-screen flex flex-col items-center justify-center gap-6 px-6"
-      style={{ background: '#080808' }}
+      style={{ background: 'radial-gradient(120% 100% at 50% 0%, #0d1020 0%, #06070d 60%, #04050a 100%)' }}
     >
       <motion.div
         initial={{ opacity: 0, y: -12 }}
         animate={{ opacity: 1, y: 0 }}
         className="text-center"
       >
-        <div className="text-4xl mb-4">🦈</div>
-        <div className="text-xl font-display font-black" style={{ color: C.amber }}>
-          SHARK TANK ARENA
-        </div>
-        <div className="text-sm font-mono mt-3" style={{ color: '#555' }}>
+        <BrandMark size="lg" />
+        <div className="text-sm font-fr-mono mt-5" style={{ color: 'rgba(238,242,247,0.55)' }}>
           請掃描老師的 QR 碼加入場次
         </div>
-        <div className="text-xs font-mono mt-2" style={{ color: '#333' }}>
+        <div className="text-xs font-fr-mono mt-2 tracking-widest" style={{ color: 'rgba(238,242,247,0.3)' }}>
           Scan the QR code to join a session
         </div>
       </motion.div>
@@ -92,18 +132,15 @@ function GroupPicker({ sessionId, onSelect }: { sessionId: string; onSelect: (id
   return (
     <main
       className="min-h-screen flex flex-col items-center justify-center gap-8 px-6"
-      style={{ background: '#080808' }}
+      style={{ background: 'radial-gradient(120% 100% at 50% 0%, #0d1020 0%, #06070d 60%, #04050a 100%)' }}
     >
       <motion.div
         initial={{ opacity: 0, y: -12 }}
         animate={{ opacity: 1, y: 0 }}
         className="text-center"
       >
-        <div className="text-4xl mb-3">🦈</div>
-        <div className="text-2xl font-display font-black" style={{ color: C.amber }}>
-          SHARK TANK ARENA
-        </div>
-        <div className="text-sm font-mono mt-2" style={{ color: '#555' }}>
+        <BrandMark size="md" />
+        <div className="text-sm font-fr-mono mt-4" style={{ color: 'rgba(238,242,247,0.55)' }}>
           請選擇你的組別
         </div>
       </motion.div>
@@ -200,6 +237,7 @@ export default function StudentPage() {
     }
   }, [gameState?.currentPitchGroupId, investor?.hasVotedCurrentPitch, riceEnabled]);
 
+  const isTeacher = groupId === TEACHER_INVESTOR_ID;
   const remaining = investor?.remainingBudget ?? 3_000_000;
   const isLow     = remaining < 100_000;
 
@@ -231,7 +269,7 @@ export default function StudentPage() {
   const isWaiting   = !gameState || gameState.phase === 'waiting';
   const isSelfPitch = !isWaiting && gameState?.currentPitchGroupId === groupId;
 
-  if (isWaiting) return <WaitingScreen groupId={groupId} groups={groups} remaining={remaining} onChangeGroup={() => {
+  if (isWaiting) return <WaitingScreen groupId={groupId} groups={groups} remaining={remaining} isTeacher={isTeacher} sessionId={sessionId} onChangeGroup={() => {
     if (sessionId) localStorage.removeItem(`shark_group_${sessionId}`);
     setGroupId('');
   }} />;
@@ -265,7 +303,7 @@ export default function StudentPage() {
     </main>
   );
 
-  const currentName = groups[groupId]?.name || `第${groupId}組`;
+  const currentName = isTeacher ? '🎤 講師（獨立投資人）' : groups[groupId]?.name || `第${groupId}組`;
 
   return (
     <main
@@ -282,6 +320,14 @@ export default function StudentPage() {
         }}
       >
         <div className="flex items-center gap-2">
+          {isTeacher && (
+            <span
+              className="text-xs font-mono font-bold px-1.5 py-0.5 rounded"
+              style={{ color: '#C08010', background: '#1a1408', border: '1px solid #2a2010' }}
+            >
+              🎤 講師
+            </span>
+          )}
           <span className="text-xs font-mono" style={{ color: '#555' }}>剩餘資金</span>
           {isLow && (
             <motion.span
@@ -303,6 +349,9 @@ export default function StudentPage() {
       </div>
 
       <div className="flex-1 px-4 py-5 space-y-4">
+        {/* Teacher: self-configurable budget */}
+        {isTeacher && <TeacherBudgetEditor sessionId={sessionId} remaining={remaining} />}
+
         {/* Current pitch */}
         <div
           className="rounded-xl p-4"
@@ -480,22 +529,81 @@ export default function StudentPage() {
         style={{ color: '#333', borderTop: '1px solid #111' }}
       >
         <span>{currentName}</span>
-        <button
-          onClick={() => {
-            if (sessionId) localStorage.removeItem(`shark_group_${sessionId}`);
-            setGroupId('');
-          }}
-          className="underline"
-          style={{ color: '#2a2a2a' }}
-        >
-          換組
-        </button>
+        {!isTeacher && (
+          <button
+            onClick={() => {
+              if (sessionId) localStorage.removeItem(`shark_group_${sessionId}`);
+              setGroupId('');
+            }}
+            className="underline"
+            style={{ color: '#2a2a2a' }}
+          >
+            換組
+          </button>
+        )}
       </div>
     </main>
   );
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────
+
+// Teacher-only: set your own investing budget right from the phone.
+function TeacherBudgetEditor({ sessionId, remaining }: { sessionId: string; remaining: number }) {
+  const [val, setVal] = useState('');
+  const [saved, setSaved] = useState(false);
+  const presets = [1_000_000, 3_000_000, 5_000_000, 10_000_000];
+
+  const apply = async (amount: number) => {
+    if (!sessionId || !Number.isFinite(amount) || amount < 0) return;
+    await setInvestorBudget(sessionId, TEACHER_INVESTOR_ID, amount, '講師');
+    setSaved(true);
+    setTimeout(() => setSaved(false), 1500);
+    setVal('');
+  };
+
+  return (
+    <div className="rounded-xl p-4" style={{ background: '#0e0e0e', border: '1px solid #2a2010' }}>
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-xs font-mono font-bold" style={{ color: C.gold }}>🎤 講師資金設定</span>
+        {saved && <span className="text-xs font-mono" style={{ color: C.green }}>✓ 已更新</span>}
+      </div>
+      <div className="text-xs font-mono mb-2" style={{ color: '#555' }}>
+        目前 <span style={{ color: C.green }}>${remaining.toLocaleString()}</span> · 可自行設定總投資額
+      </div>
+      <div className="flex gap-2 mb-2">
+        <input
+          type="number"
+          inputMode="numeric"
+          placeholder="自訂金額"
+          value={val}
+          onChange={(e) => setVal(e.target.value)}
+          className="flex-1 px-3 py-2 rounded-lg text-sm font-mono"
+          style={{ background: '#151515', border: '1px solid #2a2808', color: '#ccc', outline: 'none' }}
+        />
+        <button
+          onClick={() => val && apply(Number(val))}
+          className="px-4 py-2 rounded-lg text-sm font-mono font-bold"
+          style={{ background: 'linear-gradient(135deg, #7a4808, #C07010)', color: '#f0e0b0' }}
+        >
+          設定
+        </button>
+      </div>
+      <div className="grid grid-cols-4 gap-1.5">
+        {presets.map((p) => (
+          <button
+            key={p}
+            onClick={() => apply(p)}
+            className="py-2 rounded-lg text-xs font-mono font-bold"
+            style={{ background: '#131313', border: '1px solid #252525', color: C.gold }}
+          >
+            ${(p / 10_000).toLocaleString()}萬
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 function StepCard({
   step, title, subtitle, active, done, locked, children,
@@ -539,11 +647,13 @@ function StepCard({
 }
 
 function WaitingScreen({
-  groupId, groups, remaining, onChangeGroup,
+  groupId, groups, remaining, isTeacher, sessionId, onChangeGroup,
 }: {
   groupId: string;
   groups: Record<string, { name: string; topic: string }>;
   remaining: number;
+  isTeacher: boolean;
+  sessionId: string;
   onChangeGroup: () => void;
 }) {
   return (
@@ -556,7 +666,7 @@ function WaitingScreen({
         transition={{ duration: 3, repeat: Infinity }}
         className="text-center"
       >
-        <div className="text-5xl mb-3">🦈</div>
+        <div className="text-5xl mb-3">{isTeacher ? '🎤' : '🦈'}</div>
         <div className="text-xl font-display font-black tracking-widest" style={{ color: '#444' }}>
           等待注金開始
         </div>
@@ -564,6 +674,12 @@ function WaitingScreen({
           Waiting for funding round . . .
         </div>
       </motion.div>
+
+      {isTeacher && (
+        <div className="w-full">
+          <TeacherBudgetEditor sessionId={sessionId} remaining={remaining} />
+        </div>
+      )}
 
       <div
         className="w-full rounded-xl p-4"
@@ -575,11 +691,15 @@ function WaitingScreen({
         </div>
         <div className="flex items-center justify-between mt-2">
           <div className="text-xs font-mono" style={{ color: '#555' }}>
-            第{groupId}組{groups[groupId]?.name ? ` · ${groups[groupId].name}` : ''}
+            {isTeacher
+              ? '🎤 講師（獨立投資人）'
+              : `第${groupId}組${groups[groupId]?.name ? ` · ${groups[groupId].name}` : ''}`}
           </div>
-          <button onClick={onChangeGroup} className="text-xs font-mono underline" style={{ color: '#333' }}>
-            換組
-          </button>
+          {!isTeacher && (
+            <button onClick={onChangeGroup} className="text-xs font-mono underline" style={{ color: '#333' }}>
+              換組
+            </button>
+          )}
         </div>
       </div>
     </main>

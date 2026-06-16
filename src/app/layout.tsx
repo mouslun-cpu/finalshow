@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: '🦈 Shark Tank Arena | 創投競技場',
+  title: '▲ FUND RUSH | 資本擂台 ARENA',
   description: '大學課堂募資模擬互動系統',
 };
 

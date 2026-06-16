@@ -7,7 +7,7 @@ import {
   useGameState, usePitchData, usePresence, useGroups, useAllPitches,
   useActiveGroupIds, useAllInvestors,
   restartCurrentPitch, setGamePhase, startPitchForGroup, endPitch,
-  initInvestors, resetEverything, GROUP_IDS,
+  initInvestors, resetEverything, GROUP_IDS, TEACHER_INVESTOR_ID,
 } from '@/hooks/useGameState';
 import { useAnimQueue } from '@/hooks/useAnimQueue';
 import LedBar from '@/components/LedBar';
@@ -23,6 +23,7 @@ import type { PitchData, GroupConfig, Presence } from '@/lib/types';
 
 const TOTAL_SEGMENTS = 20;
 const TARGET_SEGMENT = 15;
+const TANK_MAX = 3_000_000; // 注金池滿刻度 300萬
 
 const C = {
   amber: '#D4850C',
@@ -75,6 +76,7 @@ export default function TeacherPage() {
   const [showVictory, setShowVictory] = useState(false);
   const [celebrated, setCelebrated]   = useState(false);
   const [showQR, setShowQR]           = useState(false);
+  const [showTeacherQR, setShowTeacherQR] = useState(false);
   const [showEditor, setShowEditor]   = useState(false);
 
   // Sync from Firebase
@@ -416,6 +418,11 @@ export default function TeacherPage() {
                 <SideBtn onClick={() => setShowEditor(true)} label="✏️ 編輯組別名稱" />
                 <SideBtn onClick={() => setShowQR(true)} label="📱 顯示 QR 碼" />
                 <SideBtn
+                  onClick={() => setShowTeacherQR(true)}
+                  label="🎤 講師投資 QR（獨立一組）"
+                  accent="green"
+                />
+                <SideBtn
                   onClick={handleInitInvestors}
                   label="🎲 初始化投資人（各 $3M）"
                   accent="green"
@@ -624,7 +631,7 @@ export default function TeacherPage() {
               <div className="flex-1 flex items-stretch justify-center gap-10 min-w-0">
 
                 {/* number stack */}
-                <div className="flex-1 flex flex-col justify-center gap-5 min-w-0" style={{ maxWidth: '620px' }}>
+                <div className="flex-1 flex flex-col justify-center gap-5 min-w-0" style={{ maxWidth: '760px' }}>
                   <div className="flex items-center gap-3">
                     <span
                       className="font-fr"
@@ -653,9 +660,10 @@ export default function TeacherPage() {
                       className="font-fr"
                       style={{
                         fontWeight: 900,
-                        fontSize: 'clamp(56px, 6.2vw, 108px)',
+                        fontSize: 'clamp(48px, 5vw, 92px)',
                         lineHeight: 0.9,
-                        letterSpacing: '-2px',
+                        letterSpacing: '-1px',
+                        whiteSpace: 'nowrap',
                         color: isSuccess ? SUCCESS : '#fff',
                         fontVariantNumeric: 'tabular-nums',
                         textShadow: '0 0 40px rgba(255,255,255,0.12)',
@@ -777,6 +785,7 @@ export default function TeacherPage() {
                     targetSegment={TARGET_SEGMENT}
                     totalRaised={displayedRaised}
                     targetAmount={targetAmount}
+                    maxAmount={TANK_MAX}
                     isSuccess={isSuccess}
                     color={activeColor}
                   />
@@ -786,9 +795,9 @@ export default function TeacherPage() {
 
               {/* RIGHT: RICE radar (if enabled) */}
               {localRice && (
-                <div className="w-[360px] flex-none flex flex-col">
+                <div className="w-[300px] flex-none flex flex-col">
                   <div
-                    className="flex-1 rounded-2xl p-4 min-h-0"
+                    className="flex-1 rounded-2xl p-3 min-h-0"
                     style={{ background: 'rgba(255,255,255,0.022)', border: '1px solid rgba(255,255,255,0.08)' }}
                   >
                     <RiceRadar pitchData={pitchData} />
@@ -803,6 +812,15 @@ export default function TeacherPage() {
       {/* Overlays */}
       <VictoryEffect show={showVictory} onComplete={() => setShowVictory(false)} />
       <QRModal sessionId={sessionId} open={showQR} onClose={() => setShowQR(false)} />
+      <QRModal
+        sessionId={sessionId}
+        open={showTeacherQR}
+        onClose={() => setShowTeacherQR(false)}
+        groupId={TEACHER_INVESTOR_ID}
+        title="🎤 講師投資端 · 獨立一組"
+        urlLabel="講師投資端網址"
+        hint="掃描後可自行設定資金，並投資當前注金組"
+      />
       <GroupEditor
         sessionId={sessionId}
         open={showEditor}

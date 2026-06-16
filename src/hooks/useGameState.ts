@@ -6,6 +6,10 @@ import type { GameState, Investor, PitchData, Transaction, RiceScore, GroupConfi
 
 export const GROUP_IDS = ['1', '2', '3', '4', '5', '6', '7', '8', '9'];
 
+// Special investor id for the teacher — an independent investor that can fund
+// any group, with a self-configurable budget, but is never a "pitching group".
+export const TEACHER_INVESTOR_ID = 'T';
+
 export function sp(sessionId: string, path: string) {
   return `/sessions/${sessionId}/${path}`;
 }
@@ -123,6 +127,19 @@ export function useInvestor(sessionId: string, investorGroupId: string) {
     });
   }, [sessionId, investorGroupId]);
   return investor;
+}
+
+// ── Set an investor's budget (used by the teacher to self-set funds) ───────
+export async function setInvestorBudget(
+  sessionId: string,
+  investorId: string,
+  amount: number,
+  groupName?: string
+) {
+  await update(ref(db, sp(sessionId, `investors/${investorId}`)), {
+    remainingBudget: Math.max(0, Math.round(amount)),
+    ...(groupName ? { groupName } : {}),
+  });
 }
 
 // ── Submit investment ─────────────────────────────────────────────────────
@@ -270,6 +287,7 @@ export async function syncInvestorsToActiveGroups(sessionId: string, activeIds: 
     }
   });
   Object.keys(existing).forEach((g) => {
+    if (g === TEACHER_INVESTOR_ID) return; // never remove the teacher investor
     if (!activeIds.includes(g)) updates[sp(sessionId, `investors/${g}`)] = null;
   });
   if (Object.keys(updates).length > 0) await update(ref(db), updates);

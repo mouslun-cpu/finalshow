@@ -18,7 +18,7 @@ function DigitSlot({ digit }: { digit: number }) {
   }, [digit, spring]);
 
   return (
-    <div className="relative overflow-hidden" style={{ height: '1.2em', width: '0.65em' }}>
+    <div className="relative" style={{ height: '1.2em', width: '0.62em', overflowY: 'hidden' }}>
       <motion.div
         style={{ y: useTransform(spring, (v) => `-${v * 10}%`) }}
         className="absolute flex flex-col"

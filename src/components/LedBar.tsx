@@ -3,13 +3,13 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useMemo } from 'react';
 import { fade, SUCCESS } from '@/lib/groupColors';
 
-const TOTAL_SEGMENTS = 20;
-
 interface LedBarProps {
   litSegments: number;
   targetSegment?: number;
   totalRaised: number;
   targetAmount: number;
+  /** Full-scale ceiling of the tank (top of the tube). Default 300萬. */
+  maxAmount?: number;
   isSuccess?: boolean;
   /** Signature neon color of the group currently raising. */
   color?: string;
@@ -26,15 +26,18 @@ export default function LedBar({
   targetSegment = 15,
   totalRaised,
   targetAmount,
+  maxAmount = 3_000_000,
   isSuccess = false,
   color = 'oklch(0.83 0.16 82)',
 }: LedBarProps) {
-  const fillPct = Math.min(100, (litSegments / TOTAL_SEGMENTS) * 100);
-  const goalPct = (targetSegment / TOTAL_SEGMENTS) * 100; // goal line height (75%)
+  // Tube is a fixed 0 → maxAmount scale; fill & goal line are positioned
+  // against that ceiling so MAX always reads a stable value (e.g. 300萬).
+  const fillPct = Math.min(100, (totalRaised / maxAmount) * 100);
+  const goalPct = Math.min(100, (targetAmount / maxAmount) * 100); // goal line height
   const progress = Math.round((totalRaised / targetAmount) * 100); // 達標進度
   const near = progress >= 82 && !isSuccess;
 
-  const maxWan = Math.round((targetAmount / targetSegment) * TOTAL_SEGMENTS / 10_000);
+  const maxWan = Math.round(maxAmount / 10_000);
   const targetWan = Math.round(targetAmount / 10_000);
 
   const bubbles = useMemo(
@@ -110,7 +113,7 @@ export default function LedBar({
       <div
         className="relative flex-1"
         style={{
-          width: '176px',
+          width: '200px',
           borderRadius: '26px',
           overflow: 'hidden',
           background: 'linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.015))',
@@ -258,7 +261,7 @@ export default function LedBar({
       {/* footer scale */}
       <div
         className="flex justify-between font-fr-mono"
-        style={{ width: '176px', fontSize: '10px', letterSpacing: '2px', color: 'rgba(238,242,247,0.4)' }}
+        style={{ width: '200px', fontSize: '10px', letterSpacing: '2px', color: 'rgba(238,242,247,0.4)' }}
       >
         <span>0</span>
         <span>MAX {maxWan}萬</span>

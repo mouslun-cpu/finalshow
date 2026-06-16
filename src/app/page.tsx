@@ -168,7 +168,7 @@ export default function Home() {
   return (
     <main
       className="min-h-screen flex flex-col items-center px-4 py-12 gap-8"
-      style={{ background: '#080808' }}
+      style={{ background: 'radial-gradient(120% 100% at 50% 0%, #0d1020 0%, #06070d 60%, #04050a 100%)' }}
     >
       {/* Title */}
       <motion.div
@@ -177,13 +177,37 @@ export default function Home() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
       >
-        <div className="text-4xl font-display font-black tracking-widest" style={{ color: C.amber }}>
-          🦈 SHARK TANK
+        <div className="flex items-center justify-center gap-3">
+          <div
+            className="rounded-xl flex items-center justify-center"
+            style={{
+              width: '46px',
+              height: '46px',
+              background: 'linear-gradient(135deg, #ffd34e, #ff6a3d)',
+              boxShadow: '0 0 28px rgba(255,150,60,0.5)',
+            }}
+          >
+            <span style={{ color: '#1a1206', fontSize: '24px' }}>▲</span>
+          </div>
+          <div
+            className="font-fr font-black"
+            style={{
+              fontSize: '40px',
+              letterSpacing: '5px',
+              lineHeight: 1,
+              background: 'linear-gradient(90deg,#ffe07a,#ff7a45)',
+              WebkitBackgroundClip: 'text',
+              backgroundClip: 'text',
+              color: 'transparent',
+            }}
+          >
+            FUND RUSH
+          </div>
         </div>
-        <div className="text-lg font-display font-black tracking-[0.5em] mt-1" style={{ color: C.gold }}>
-          ARENA
+        <div className="font-fr-mono mt-2 tracking-[0.4em]" style={{ fontSize: '12px', color: 'rgba(238,242,247,0.45)' }}>
+          資本擂台 ARENA
         </div>
-        <div className="text-xs font-mono mt-3 tracking-widest" style={{ color: '#333' }}>
+        <div className="text-xs font-fr-mono mt-3 tracking-widest" style={{ color: '#444' }}>
           場次管理 · Session Manager
         </div>
       </motion.div>
