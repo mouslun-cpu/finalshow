@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { db } from '@/lib/firebase';
 import {
   useGameState, usePitchData, usePresence, useGroups, useAllPitches,
-  useActiveGroupIds, useAllInvestors,
+  useActiveGroupIds, useAllInvestors, useFeedback,
   restartCurrentPitch, setGamePhase, startPitchForGroup, endPitch,
   initInvestors, resetEverything, GROUP_IDS, TEACHER_INVESTOR_ID,
 } from '@/hooks/useGameState';
@@ -19,7 +19,7 @@ import QRModal from '@/components/QRModal';
 import GroupEditor from '@/components/GroupEditor';
 import GroupPresence from '@/components/GroupPresence';
 import Leaderboard from '@/components/Leaderboard';
-import type { PitchData, GroupConfig, Presence } from '@/lib/types';
+import type { PitchData, GroupConfig, Presence, Feedback } from '@/lib/types';
 
 const TOTAL_SEGMENTS = 20;
 const TARGET_SEGMENT = 15;
@@ -52,6 +52,7 @@ export default function TeacherPage() {
   const allPitches     = useAllPitches(sessionId);
   const activeGroupIds = useActiveGroupIds(sessionId);
   const allInvestors   = useAllInvestors(sessionId);
+  const feedback       = useFeedback(sessionId);
   const pitchData      = usePitchData(sessionId, gameState?.currentPitchGroupId ?? null);
   const targetAmount   = gameState?.targetAmount ?? 1_500_000;
 
@@ -72,6 +73,10 @@ export default function TeacherPage() {
   const [loading, setLoading]                 = useState(false);
   const [statusMsg, setStatusMsg]             = useState('');
 
+  // RICE review: which group's RICE radar to show (follows live pitch, but
+  // can be switched to review any completed group's stored scores).
+  const [riceViewId, setRiceViewId] = useState('');
+
   // Overlays
   const [showVictory, setShowVictory] = useState(false);
   const [celebrated, setCelebrated]   = useState(false);
@@ -87,6 +92,11 @@ export default function TeacherPage() {
   useEffect(() => {
     if (gameState?.riceEnabled !== undefined) setLocalRice(gameState.riceEnabled);
   }, [gameState?.riceEnabled]);
+
+  // RICE radar follows the live pitch group when one is active.
+  useEffect(() => {
+    if (gameState?.currentPitchGroupId) setRiceViewId(gameState.currentPitchGroupId);
+  }, [gameState?.currentPitchGroupId]);
 
   // Victory
   useEffect(() => {
@@ -793,15 +803,44 @@ export default function TeacherPage() {
                 </div>
               </div>
 
-              {/* RIGHT: RICE radar (if enabled) */}
+              {/* RIGHT: RICE radar (if enabled) + questions */}
               {localRice && (
-                <div className="w-[300px] flex-none flex flex-col">
+                <div className="w-[300px] flex-none flex flex-col gap-3 overflow-y-auto">
                   <div
-                    className="flex-1 rounded-2xl p-3 min-h-0"
+                    className="rounded-2xl p-3"
                     style={{ background: 'rgba(255,255,255,0.022)', border: '1px solid rgba(255,255,255,0.08)' }}
                   >
-                    <RiceRadar pitchData={pitchData} />
+                    {/* group selector — review any group's stored RICE */}
+                    <div className="flex flex-wrap gap-1 mb-2">
+                      {activeGroupIds
+                        .filter((id) => (allPitches[id]?.riceScores?.voteCount ?? 0) > 0 || id === gameState?.currentPitchGroupId)
+                        .map((id) => {
+                          const sel = riceViewId === id;
+                          const live = id === gameState?.currentPitchGroupId;
+                          const col = groupColor(id);
+                          return (
+                            <button
+                              key={id}
+                              onClick={() => setRiceViewId(id)}
+                              className="font-fr-mono rounded-md px-2 py-1"
+                              style={{
+                                fontSize: '11px',
+                                fontWeight: 700,
+                                background: sel ? fade(col, 22) : 'rgba(255,255,255,0.03)',
+                                border: `1px solid ${sel ? fade(col, 60) : 'rgba(255,255,255,0.08)'}`,
+                                color: sel ? '#fff' : 'rgba(238,242,247,0.5)',
+                              }}
+                            >
+                              {id}{live && <span style={{ color: SUCCESS }}> ●</span>}
+                            </button>
+                          );
+                        })}
+                    </div>
+                    <RiceRadar pitchData={allPitches[riceViewId] ?? pitchData} />
                   </div>
+
+                  {/* 各組提問 */}
+                  <QuestionsPanel feedback={feedback} groups={groups} />
                 </div>
               )}
             </div>
@@ -857,6 +896,94 @@ function SideBtn({
     >
       {label}
     </button>
+  );
+}
+
+function QuestionsPanel({
+  feedback,
+  groups,
+}: {
+  feedback: Record<string, Feedback>;
+  groups: Record<string, GroupConfig>;
+}) {
+  const [hideAsker, setHideAsker] = useState(false);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  const items = Object.entries(feedback)
+    .map(([id, f]) => ({ id, ...f }))
+    .sort((a, b) => b.timestamp - a.timestamp);
+
+  const askerLabel = (gid: string) =>
+    gid === 'T' ? '🎤 講師' : groups[gid]?.name || `第${gid}組`;
+
+  return (
+    <div
+      className="rounded-2xl p-3 flex flex-col min-h-0"
+      style={{ background: 'rgba(255,255,255,0.022)', border: '1px solid rgba(255,255,255,0.08)' }}
+    >
+      <div className="flex items-center justify-between mb-2">
+        <span className="font-fr-mono" style={{ fontSize: '12px', letterSpacing: '2px', color: '#fff' }}>
+          💬 各組提問 <span style={{ color: 'rgba(255,255,255,0.5)' }}>({items.length})</span>
+        </span>
+        <button
+          onClick={() => setHideAsker((v) => !v)}
+          className="font-fr-mono rounded-md px-2 py-0.5"
+          style={{
+            fontSize: '10px',
+            background: 'rgba(255,255,255,0.04)',
+            border: '1px solid rgba(255,255,255,0.1)',
+            color: 'rgba(238,242,247,0.6)',
+          }}
+        >
+          {hideAsker ? '顯示組別' : '隱藏組別'}
+        </button>
+      </div>
+
+      {items.length === 0 ? (
+        <div className="font-fr-mono text-center py-4" style={{ fontSize: '11px', color: 'rgba(238,242,247,0.3)' }}>
+          尚無提問
+        </div>
+      ) : (
+        <div className="space-y-1.5 overflow-y-auto" style={{ maxHeight: '240px' }}>
+          {items.map((it) => {
+            const open = expandedId === it.id;
+            return (
+              <button
+                key={it.id}
+                onClick={() => setExpandedId(open ? null : it.id)}
+                className="w-full text-left rounded-lg px-2.5 py-2"
+                style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}
+              >
+                <div className="flex items-center gap-1.5 mb-1" style={{ fontSize: '10px' }}>
+                  {!hideAsker && (
+                    <span className="font-fr-mono" style={{ color: groupColor(it.investorGroupId), fontWeight: 700 }}>
+                      {askerLabel(it.investorGroupId)}
+                    </span>
+                  )}
+                  <span className="font-fr-mono" style={{ color: 'rgba(238,242,247,0.4)' }}>
+                    → 第{it.pitchGroupId}組
+                  </span>
+                </div>
+                <div
+                  className={`font-fr-mono ${open ? '' : 'truncate'}`}
+                  style={{ fontSize: '11px', color: 'rgba(238,242,247,0.85)', whiteSpace: open ? 'pre-wrap' : 'nowrap' }}
+                >
+                  ❓ {it.question}
+                </div>
+                {open && it.reason && (
+                  <div
+                    className="font-fr-mono mt-1 pt-1"
+                    style={{ fontSize: '11px', color: 'rgba(238,242,247,0.55)', whiteSpace: 'pre-wrap', borderTop: '1px solid rgba(255,255,255,0.08)' }}
+                  >
+                    💡 {it.reason}
+                  </div>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 }
 

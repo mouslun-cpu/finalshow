@@ -38,6 +38,17 @@ export interface Transaction {
   riceE: number;
   timestamp: number;
   animated: boolean;
+  reason?: string;
+  question?: string;
+}
+
+// Investor's written investment reason + question for a pitching group.
+export interface Feedback {
+  investorGroupId: string;
+  pitchGroupId: string;
+  reason: string;
+  question: string;
+  timestamp: number;
 }
 
 export interface RiceScore {

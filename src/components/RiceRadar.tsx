@@ -44,13 +44,13 @@ export default function RiceRadar({ pitchData }: RiceRadarProps) {
   ];
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col">
       <div className="font-fr-mono mb-1" style={{ fontSize: '12px', letterSpacing: '2px', color: '#ffffff' }}>
         RICE 班級評估{' '}
         {n > 0 && <span style={{ color: 'rgba(255,255,255,0.55)' }}>({n} 票)</span>}
       </div>
 
-      <ResponsiveContainer width="100%" height="100%">
+      <ResponsiveContainer width="100%" height={220}>
         <RadarChart data={data} margin={{ top: 18, right: 38, bottom: 18, left: 38 }}>
           <PolarGrid stroke="#2a2a2a" />
           <PolarAngleAxis dataKey="axis" tick={<AxisTick />} />

@@ -219,8 +219,10 @@ export default function StudentPage() {
 
   const riceEnabled = gameState?.riceEnabled ?? true;
 
-  const [step, setStep]               = useState<'rice' | 'invest' | 'done'>('rice');
+  const [step, setStep]               = useState<'rice' | 'qa' | 'invest' | 'done'>('rice');
   const [rice, setRice]               = useState<RiceScore>({ R: 5, I: 5, C: 5, E: 5 });
+  const [reason, setReason]           = useState('');
+  const [question, setQuestion]       = useState('');
   const [investAmount, setInvestAmount] = useState(0);
   const [submitting, setSubmitting]   = useState(false);
   const [error, setError]             = useState('');
@@ -231,11 +233,15 @@ export default function StudentPage() {
     if (investor.hasVotedCurrentPitch) {
       setStep('done');
     } else {
-      setStep(riceEnabled ? 'rice' : 'invest');
+      setStep(riceEnabled ? 'rice' : 'qa');
       setInvestAmount(0);
+      setReason('');
+      setQuestion('');
       setError('');
     }
   }, [gameState?.currentPitchGroupId, investor?.hasVotedCurrentPitch, riceEnabled]);
+
+  const qaComplete = reason.trim().length > 0 && question.trim().length > 0;
 
   const isTeacher = groupId === TEACHER_INVESTOR_ID;
   const remaining = investor?.remainingBudget ?? 3_000_000;
@@ -248,19 +254,23 @@ export default function StudentPage() {
 
   const handleSubmit = useCallback(async () => {
     if (!gameState?.currentPitchGroupId || !groupId || !sessionId) return;
+    if (!reason.trim() || !question.trim()) { setError('請先填寫投資理由與提問'); return; }
     if (investAmount <= 0) { setError('請設定投資金額'); return; }
     if (investAmount > remaining) { setError('餘額不足！'); return; }
     setSubmitting(true);
     try {
       const effectiveRice = riceEnabled ? rice : { R: 0, I: 0, C: 0, E: 0 };
-      await submitInvestment(sessionId, groupId, gameState.currentPitchGroupId, investAmount, effectiveRice);
+      await submitInvestment(
+        sessionId, groupId, gameState.currentPitchGroupId, investAmount, effectiveRice,
+        reason.trim(), question.trim()
+      );
       setStep('done');
     } catch (_) {
       setError('送出失敗，請重試');
     } finally {
       setSubmitting(false);
     }
-  }, [sessionId, gameState, groupId, investAmount, remaining, rice, riceEnabled]);
+  }, [sessionId, gameState, groupId, investAmount, remaining, rice, riceEnabled, reason, question]);
 
   if (!hydrated) return null;
   if (!sessionId) return <NoSessionScreen />;
@@ -385,7 +395,7 @@ export default function StudentPage() {
                 <RiceSlider label="E" sublabel="資源消耗 Effort"    value={rice.E} onChange={(v) => setRice((r) => ({ ...r, E: v }))} color={C.purple} />
 
                 <motion.button
-                  onClick={() => setStep('invest')}
+                  onClick={() => setStep('qa')}
                   className="w-full py-4 rounded-xl font-mono font-bold text-base"
                   style={{
                     background: 'linear-gradient(90deg, #7A5008, #C08010)',
@@ -394,7 +404,7 @@ export default function StudentPage() {
                   }}
                   whileTap={{ scale: 0.97 }}
                 >
-                  ✅ 完成評估，解鎖投資
+                  ✅ 完成評估，下一步
                 </motion.button>
               </div>
             )}
@@ -408,10 +418,67 @@ export default function StudentPage() {
           </StepCard>
         )}
 
-        {/* Step 2: Invest */}
+        {/* Step: 投資理由 + 提問（必填） */}
         <StepCard
-          step={riceEnabled ? 2 : 1} title="注入資金 Investment" subtitle="選擇你的注金金額"
-          active={step === 'invest'} done={step === 'done'} locked={riceEnabled && step === 'rice'}
+          step={riceEnabled ? 2 : 1} title="投資理由與提問 Q&A" subtitle="兩欄皆必填，送出後才能注金"
+          active={step === 'qa'} done={step === 'invest' || step === 'done'}
+          locked={riceEnabled && step === 'rice'}
+        >
+          {step === 'qa' && (
+            <div className="space-y-4 mt-4">
+              <div>
+                <div className="text-xs font-mono mb-1.5" style={{ color: C.amber }}>
+                  💡 投資理由 <span style={{ color: '#C04040' }}>*</span>
+                </div>
+                <textarea
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                  placeholder="為什麼決定投資這一組？"
+                  rows={3}
+                  className="w-full px-3 py-2.5 rounded-lg text-sm font-mono resize-y"
+                  style={{ background: '#0a0a0a', border: '1px solid #252525', color: '#ccc', outline: 'none' }}
+                />
+              </div>
+              <div>
+                <div className="text-xs font-mono mb-1.5" style={{ color: C.blue }}>
+                  ❓ 想提出的問題 <span style={{ color: '#C04040' }}>*</span>
+                </div>
+                <textarea
+                  value={question}
+                  onChange={(e) => setQuestion(e.target.value)}
+                  placeholder="對這一組的提問…"
+                  rows={3}
+                  className="w-full px-3 py-2.5 rounded-lg text-sm font-mono resize-y"
+                  style={{ background: '#0a0a0a', border: '1px solid #252525', color: '#ccc', outline: 'none' }}
+                />
+              </div>
+              <motion.button
+                onClick={() => qaComplete && setStep('invest')}
+                disabled={!qaComplete}
+                className="w-full py-4 rounded-xl font-mono font-bold text-base"
+                style={{
+                  background: qaComplete ? 'linear-gradient(90deg, #7A5008, #C08010)' : '#141414',
+                  color: qaComplete ? '#f0e0b0' : '#444',
+                  border: `1px solid ${qaComplete ? '#8B6010' : '#1e1e1e'}`,
+                }}
+                whileTap={qaComplete ? { scale: 0.97 } : undefined}
+              >
+                {qaComplete ? '✅ 送出，解鎖注金' : '請填寫兩欄後解鎖'}
+              </motion.button>
+            </div>
+          )}
+          {(step === 'invest' || step === 'done') && (
+            <div className="mt-2.5 text-xs font-mono space-y-1" style={{ color: '#555' }}>
+              <div className="truncate">💡 {reason || '—'}</div>
+              <div className="truncate">❓ {question || '—'}</div>
+            </div>
+          )}
+        </StepCard>
+
+        {/* Step: Invest */}
+        <StepCard
+          step={riceEnabled ? 3 : 2} title="注入資金 Investment" subtitle="選擇你的注金金額"
+          active={step === 'invest'} done={step === 'done'} locked={step === 'rice' || step === 'qa'}
         >
           {step === 'invest' && (
             <div className="space-y-3 mt-4">

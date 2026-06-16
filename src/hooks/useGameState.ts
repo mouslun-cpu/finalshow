@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import { ref, onValue, set, update, push, get, remove } from 'firebase/database';
 import { db } from '@/lib/firebase';
-import type { GameState, Investor, PitchData, Transaction, RiceScore, GroupConfig, Presence } from '@/lib/types';
+import type { GameState, Investor, PitchData, Transaction, RiceScore, GroupConfig, Presence, Feedback } from '@/lib/types';
 
 export const GROUP_IDS = ['1', '2', '3', '4', '5', '6', '7', '8', '9'];
 
@@ -98,6 +98,18 @@ export function usePresence(sessionId: string) {
   return presence;
 }
 
+// ── Watch feedback (investor reasons / questions) ─────────────────────────
+export function useFeedback(sessionId: string) {
+  const [feedback, setFeedback] = useState<Record<string, Feedback>>({});
+  useEffect(() => {
+    if (!sessionId) return;
+    return onValue(ref(db, sp(sessionId, 'feedback')), (snap) => {
+      setFeedback(snap.val() ?? {});
+    });
+  }, [sessionId]);
+  return feedback;
+}
+
 // ── Ping presence (student) ───────────────────────────────────────────────
 export async function pingPresence(sessionId: string, groupId: string) {
   await set(ref(db, sp(sessionId, `presence/${groupId}`)), {
@@ -148,8 +160,11 @@ export async function submitInvestment(
   investorGroupId: string,
   pitchGroupId: string,
   amount: number,
-  rice: RiceScore
+  rice: RiceScore,
+  reason = '',
+  question = ''
 ) {
+  const ts = Date.now();
   const txRef = push(ref(db, sp(sessionId, 'transactions')));
   await set(txRef, {
     investorGroupId,
@@ -159,9 +174,22 @@ export async function submitInvestment(
     riceI: rice.I,
     riceC: rice.C,
     riceE: rice.E,
-    timestamp: Date.now(),
+    timestamp: ts,
     animated: false,
+    reason,
+    question,
   });
+
+  // Persist the written reason / question separately for the teacher view.
+  if (reason || question) {
+    await set(push(ref(db, sp(sessionId, 'feedback'))), {
+      investorGroupId,
+      pitchGroupId,
+      reason,
+      question,
+      timestamp: ts,
+    } satisfies Feedback);
+  }
 
   const invSnap = await get(ref(db, sp(sessionId, `investors/${investorGroupId}`)));
   const invData = invSnap.val() as Investor;
