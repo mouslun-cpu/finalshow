@@ -803,9 +803,9 @@ export default function TeacherPage() {
                 </div>
               </div>
 
-              {/* RIGHT: RICE radar (if enabled) + questions */}
-              {localRice && (
-                <div className="w-[300px] flex-none flex flex-col gap-3 overflow-y-auto">
+              {/* RIGHT: RICE radar (if enabled) + questions (always shown) */}
+              <div className="w-[300px] flex-none flex flex-col gap-3 overflow-y-auto">
+                {localRice && (
                   <div
                     className="rounded-2xl p-3"
                     style={{ background: 'rgba(255,255,255,0.022)', border: '1px solid rgba(255,255,255,0.08)' }}
@@ -838,11 +838,15 @@ export default function TeacherPage() {
                     </div>
                     <RiceRadar pitchData={allPitches[riceViewId] ?? pitchData} />
                   </div>
+                )}
 
-                  {/* 各組提問 */}
-                  <QuestionsPanel feedback={feedback} groups={groups} />
-                </div>
-              )}
+                {/* 各組提問 */}
+                <QuestionsPanel
+                  feedback={feedback}
+                  groups={groups}
+                  currentPitchGroupId={gameState?.currentPitchGroupId ?? ''}
+                />
+              </div>
             </div>
           </div>
         )}
@@ -902,16 +906,26 @@ function SideBtn({
 function QuestionsPanel({
   feedback,
   groups,
+  currentPitchGroupId,
 }: {
   feedback: Record<string, Feedback>;
   groups: Record<string, GroupConfig>;
+  currentPitchGroupId: string;
 }) {
   const [hideAsker, setHideAsker] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  // Default to focusing on the currently pitching group so the teacher can run
+  // through its questions one by one; toggle to review every group's questions.
+  const [onlyCurrent, setOnlyCurrent] = useState(true);
 
-  const items = Object.entries(feedback)
+  const allItems = Object.entries(feedback)
     .map(([id, f]) => ({ id, ...f }))
     .sort((a, b) => b.timestamp - a.timestamp);
+
+  const items =
+    onlyCurrent && currentPitchGroupId
+      ? allItems.filter((it) => it.pitchGroupId === currentPitchGroupId)
+      : allItems;
 
   const askerLabel = (gid: string) =>
     gid === 'T' ? '🎤 講師' : groups[gid]?.name || `第${gid}組`;
@@ -923,25 +937,40 @@ function QuestionsPanel({
     >
       <div className="flex items-center justify-between mb-2">
         <span className="font-fr-mono" style={{ fontSize: '12px', letterSpacing: '2px', color: '#fff' }}>
-          💬 各組提問 <span style={{ color: 'rgba(255,255,255,0.5)' }}>({items.length})</span>
+          💬 {onlyCurrent && currentPitchGroupId ? '當前提問' : '各組提問'}{' '}
+          <span style={{ color: 'rgba(255,255,255,0.5)' }}>({items.length})</span>
         </span>
-        <button
-          onClick={() => setHideAsker((v) => !v)}
-          className="font-fr-mono rounded-md px-2 py-0.5"
-          style={{
-            fontSize: '10px',
-            background: 'rgba(255,255,255,0.04)',
-            border: '1px solid rgba(255,255,255,0.1)',
-            color: 'rgba(238,242,247,0.6)',
-          }}
-        >
-          {hideAsker ? '顯示組別' : '隱藏組別'}
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => setOnlyCurrent((v) => !v)}
+            className="font-fr-mono rounded-md px-2 py-0.5"
+            style={{
+              fontSize: '10px',
+              background: onlyCurrent ? 'rgba(80,200,120,0.12)' : 'rgba(255,255,255,0.04)',
+              border: `1px solid ${onlyCurrent ? 'rgba(80,200,120,0.4)' : 'rgba(255,255,255,0.1)'}`,
+              color: onlyCurrent ? '#7fd99b' : 'rgba(238,242,247,0.6)',
+            }}
+          >
+            {onlyCurrent ? '當前組' : '全部'}
+          </button>
+          <button
+            onClick={() => setHideAsker((v) => !v)}
+            className="font-fr-mono rounded-md px-2 py-0.5"
+            style={{
+              fontSize: '10px',
+              background: 'rgba(255,255,255,0.04)',
+              border: '1px solid rgba(255,255,255,0.1)',
+              color: 'rgba(238,242,247,0.6)',
+            }}
+          >
+            {hideAsker ? '顯示組別' : '隱藏組別'}
+          </button>
+        </div>
       </div>
 
       {items.length === 0 ? (
         <div className="font-fr-mono text-center py-4" style={{ fontSize: '11px', color: 'rgba(238,242,247,0.3)' }}>
-          尚無提問
+          {onlyCurrent && currentPitchGroupId ? '當前注金組尚無提問' : '尚無提問'}
         </div>
       ) : (
         <div className="space-y-1.5 overflow-y-auto" style={{ maxHeight: '240px' }}>
