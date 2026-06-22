@@ -12,36 +12,42 @@ interface RiceRadarProps {
 const ACCENT = '#1499AA';
 
 // Custom axis label: axis name in white + the score right on the chart,
-// so we no longer need a separate row of numbers underneath.
-function AxisTick(props: any) {
-  const { x, y, payload, cx, cy } = props;
-  const value: number = payload?.value?.score ?? 0;
-  const label: string = payload?.value?.label ?? payload?.value ?? '';
-  // nudge the label outward from the centre so it never overlaps the web
-  const dx = x - cx > 6 ? 6 : x - cx < -6 ? -6 : 0;
-  const anchor = x - cx > 6 ? 'start' : x - cx < -6 ? 'end' : 'middle';
-  return (
-    <text x={x + dx} y={y} textAnchor={anchor} dominantBaseline="middle">
-      <tspan fill="#ffffff" fontSize={12} fontWeight={700} fontFamily="monospace">
-        {label}
-      </tspan>
-      <tspan fill={ACCENT} fontSize={13} fontWeight={800} fontFamily="monospace" dx={6}>
-        {value || '—'}
-      </tspan>
-    </text>
-  );
+// so we no longer need a separate row of numbers underneath. Scores are looked
+// up by tick index from the chart data, so the angle axis can stay a plain
+// string category (required for Recharts to draw the radar polygon).
+function makeAxisTick(scores: number[]) {
+  return function AxisTick(props: any) {
+    const { x, y, payload, cx, index } = props;
+    const label: string = payload?.value ?? '';
+    const value = scores[index] ?? 0;
+    // nudge the label outward from the centre so it never overlaps the web
+    const dx = x - cx > 6 ? 6 : x - cx < -6 ? -6 : 0;
+    const anchor = x - cx > 6 ? 'start' : x - cx < -6 ? 'end' : 'middle';
+    return (
+      <text x={x + dx} y={y} textAnchor={anchor} dominantBaseline="middle">
+        <tspan fill="#ffffff" fontSize={12} fontWeight={700} fontFamily="monospace">
+          {label}
+        </tspan>
+        <tspan fill={ACCENT} fontSize={13} fontWeight={800} fontFamily="monospace" dx={6}>
+          {value || '—'}
+        </tspan>
+      </text>
+    );
+  };
 }
 
 export default function RiceRadar({ pitchData }: RiceRadarProps) {
   const s = pitchData?.riceScores;
   const n = s?.voteCount ?? 0;
 
+  const avg = (total?: number) => (n ? +(((total ?? 0) / n)).toFixed(1) : 0);
   const data = [
-    { axis: { label: 'R 目標性',   score: n ? +(s!.R_total / n).toFixed(1) : 0 }, value: n ? +(s!.R_total / n).toFixed(1) : 0, fullMark: 10 },
-    { axis: { label: 'I 影響力',   score: n ? +(s!.I_total / n).toFixed(1) : 0 }, value: n ? +(s!.I_total / n).toFixed(1) : 0, fullMark: 10 },
-    { axis: { label: 'C 自信心',   score: n ? +(s!.C_total / n).toFixed(1) : 0 }, value: n ? +(s!.C_total / n).toFixed(1) : 0, fullMark: 10 },
-    { axis: { label: 'E 資源消耗', score: n ? +(s!.E_total / n).toFixed(1) : 0 }, value: n ? +(s!.E_total / n).toFixed(1) : 0, fullMark: 10 },
+    { axis: 'R 目標性',   value: avg(s?.R_total), fullMark: 10 },
+    { axis: 'I 影響力',   value: avg(s?.I_total), fullMark: 10 },
+    { axis: 'C 自信心',   value: avg(s?.C_total), fullMark: 10 },
+    { axis: 'E 資源消耗', value: avg(s?.E_total), fullMark: 10 },
   ];
+  const AxisTick = makeAxisTick(data.map((d) => d.value));
 
   return (
     <div className="flex flex-col">
@@ -59,8 +65,9 @@ export default function RiceRadar({ pitchData }: RiceRadarProps) {
             dataKey="value"
             stroke={ACCENT}
             fill={ACCENT}
-            fillOpacity={0.22}
-            strokeWidth={1.8}
+            fillOpacity={0.35}
+            strokeWidth={2}
+            isAnimationActive={false}
           />
           <Tooltip
             contentStyle={{

@@ -913,7 +913,8 @@ function QuestionsPanel({
   currentPitchGroupId: string;
 }) {
   const [hideAsker, setHideAsker] = useState(false);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
+  // The question opened in the centred spotlight modal (null = closed).
+  const [zoomId, setZoomId] = useState<string | null>(null);
   // Default to focusing on the currently pitching group so the teacher can run
   // through its questions one by one; toggle to review every group's questions.
   const [onlyCurrent, setOnlyCurrent] = useState(true);
@@ -929,6 +930,8 @@ function QuestionsPanel({
 
   const askerLabel = (gid: string) =>
     gid === 'T' ? '🎤 講師' : groups[gid]?.name || `第${gid}組`;
+
+  const zoomed = items.find((it) => it.id === zoomId) ?? null;
 
   return (
     <div
@@ -973,45 +976,108 @@ function QuestionsPanel({
           {onlyCurrent && currentPitchGroupId ? '當前注金組尚無提問' : '尚無提問'}
         </div>
       ) : (
-        <div className="space-y-1.5 overflow-y-auto" style={{ maxHeight: '240px' }}>
-          {items.map((it) => {
-            const open = expandedId === it.id;
-            return (
-              <button
-                key={it.id}
-                onClick={() => setExpandedId(open ? null : it.id)}
-                className="w-full text-left rounded-lg px-2.5 py-2"
-                style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}
-              >
-                <div className="flex items-center gap-1.5 mb-1" style={{ fontSize: '10px' }}>
-                  {!hideAsker && (
-                    <span className="font-fr-mono" style={{ color: groupColor(it.investorGroupId), fontWeight: 700 }}>
-                      {askerLabel(it.investorGroupId)}
-                    </span>
-                  )}
-                  <span className="font-fr-mono" style={{ color: 'rgba(238,242,247,0.4)' }}>
-                    → 第{it.pitchGroupId}組
+        <div className="space-y-1.5 overflow-y-auto pr-0.5" style={{ maxHeight: '52vh' }}>
+          {items.map((it) => (
+            <button
+              key={it.id}
+              onClick={() => setZoomId(it.id)}
+              className="w-full text-left rounded-lg px-2.5 py-2"
+              style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}
+            >
+              <div className="flex items-center gap-1.5 mb-1" style={{ fontSize: '10px' }}>
+                {!hideAsker && (
+                  <span className="font-fr-mono" style={{ color: groupColor(it.investorGroupId), fontWeight: 700 }}>
+                    {askerLabel(it.investorGroupId)}
                   </span>
-                </div>
-                <div
-                  className={`font-fr-mono ${open ? '' : 'truncate'}`}
-                  style={{ fontSize: '11px', color: 'rgba(238,242,247,0.85)', whiteSpace: open ? 'pre-wrap' : 'nowrap' }}
-                >
-                  ❓ {it.question}
-                </div>
-                {open && it.reason && (
-                  <div
-                    className="font-fr-mono mt-1 pt-1"
-                    style={{ fontSize: '11px', color: 'rgba(238,242,247,0.55)', whiteSpace: 'pre-wrap', borderTop: '1px solid rgba(255,255,255,0.08)' }}
-                  >
-                    💡 {it.reason}
-                  </div>
                 )}
-              </button>
-            );
-          })}
+                <span className="font-fr-mono" style={{ color: 'rgba(238,242,247,0.4)' }}>
+                  → 第{it.pitchGroupId}組
+                </span>
+              </div>
+              <div
+                className="font-fr-mono truncate"
+                style={{ fontSize: '11px', color: 'rgba(238,242,247,0.85)', whiteSpace: 'nowrap' }}
+              >
+                ❓ {it.question}
+              </div>
+            </button>
+          ))}
         </div>
       )}
+
+      {/* Spotlight modal — enlarge a question to screen centre for the class */}
+      <AnimatePresence>
+        {zoomed && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setZoomId(null)}
+            className="fixed inset-0 z-[60] flex items-center justify-center p-6"
+            style={{ background: 'rgba(0,0,0,0.78)', backdropFilter: 'blur(4px)' }}
+          >
+            <motion.div
+              initial={{ scale: 0.9, y: 16 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.9, y: 16 }}
+              transition={{ type: 'spring', stiffness: 260, damping: 24 }}
+              onClick={(e) => e.stopPropagation()}
+              className="rounded-3xl p-8 md:p-10"
+              style={{
+                width: 'min(880px, 92vw)',
+                maxHeight: '86vh',
+                overflowY: 'auto',
+                background: 'linear-gradient(180deg, #14181d, #0d1014)',
+                border: `1px solid ${fade(groupColor(zoomed.investorGroupId), 45)}`,
+                boxShadow: `0 24px 80px rgba(0,0,0,0.6), 0 0 60px ${fade(groupColor(zoomed.investorGroupId), 20)}`,
+              }}
+            >
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3 font-fr-mono" style={{ fontSize: '18px' }}>
+                  <span style={{ color: groupColor(zoomed.investorGroupId), fontWeight: 800 }}>
+                    {askerLabel(zoomed.investorGroupId)}
+                  </span>
+                  <span style={{ color: 'rgba(238,242,247,0.45)' }}>→ 第{zoomed.pitchGroupId}組</span>
+                </div>
+                <button
+                  onClick={() => setZoomId(null)}
+                  className="font-fr-mono rounded-lg px-3 py-1.5"
+                  style={{
+                    fontSize: '13px',
+                    background: 'rgba(255,255,255,0.06)',
+                    border: '1px solid rgba(255,255,255,0.14)',
+                    color: 'rgba(238,242,247,0.8)',
+                  }}
+                >
+                  ✕ 關閉
+                </button>
+              </div>
+
+              <div
+                className="font-fr"
+                style={{ fontSize: 'clamp(24px, 3.4vw, 40px)', lineHeight: 1.4, fontWeight: 700, color: '#ffffff', whiteSpace: 'pre-wrap' }}
+              >
+                ❓ {zoomed.question}
+              </div>
+
+              {zoomed.reason && (
+                <div
+                  className="font-fr mt-6 pt-5"
+                  style={{
+                    fontSize: 'clamp(16px, 1.8vw, 22px)',
+                    lineHeight: 1.5,
+                    color: 'rgba(238,242,247,0.7)',
+                    whiteSpace: 'pre-wrap',
+                    borderTop: '1px solid rgba(255,255,255,0.1)',
+                  }}
+                >
+                  💡 {zoomed.reason}
+                </div>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
